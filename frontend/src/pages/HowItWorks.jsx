@@ -16,7 +16,7 @@ export default function HowItWorks() {
         <div className="section-padding max-w-7xl mx-auto text-center">
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
             <h1 className="text-4xl font-bold mb-4">How It Works</h1>
-            <p className="text-blue-200 max-w-2xl mx-auto">Four simple steps to power your home</p>
+            <p className="text-primary-200 max-w-2xl mx-auto">Four simple steps to power your home</p>
           </motion.div>
         </div>
       </section>

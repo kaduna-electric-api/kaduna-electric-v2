@@ -8,7 +8,7 @@ import toast from 'react-hot-toast';
 
 const statusColors = {
   Pending: 'bg-yellow-100 text-yellow-700',
-  'Under Review': 'bg-blue-100 text-blue-700',
+  'Under Review': 'bg-primary-100 text-primary-700',
   Resolved: 'bg-green-100 text-green-700',
   Closed: 'bg-gray-100 text-gray-700'
 };

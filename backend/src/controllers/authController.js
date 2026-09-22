@@ -128,6 +128,18 @@ exports.setupAdmin = async (req, res) => {
     if (secretKey !== process.env.ADMIN_SECRET_KEY) {
       return res.status(403).json({ message: 'Invalid admin secret key' });
     }
+    // If PRIMARY_ADMIN_EMAIL is set, only allow that email to become admin
+    const primaryAdmin = process.env.PRIMARY_ADMIN_EMAIL;
+    if (primaryAdmin && primaryAdmin !== email) {
+      return res.status(403).json({ message: 'Admin can only be assigned to the primary admin email' });
+    }
+
+    // Prevent creating multiple admins. Allow re-assigning the same admin.
+    const existingAdmin = await User.findOne({ role: 'admin' });
+    if (existingAdmin && existingAdmin.email !== email) {
+      return res.status(403).json({ message: 'An admin already exists' });
+    }
+
     const user = await User.findOneAndUpdate(
       { email },
       { role: 'admin' },

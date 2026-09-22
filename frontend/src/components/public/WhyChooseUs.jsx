@@ -16,7 +16,7 @@ export default function WhyChooseUs() {
       <div className="section-padding max-w-7xl mx-auto">
         <motion.div initial={{ opacity: 0 }} whileInView={{ opacity: 1 }} viewport={{ once: true }} className="text-center mb-12">
           <h2 className="text-3xl font-bold mb-4">Why Choose Us</h2>
-          <p className="text-blue-200">The most reliable way to purchase electricity tokens</p>
+          <p className="text-primary-200">The most reliable way to purchase electricity tokens</p>
         </motion.div>
         <div className="grid md:grid-cols-2 gap-6 max-w-3xl mx-auto">
           {benefits.map((b, i) => (
