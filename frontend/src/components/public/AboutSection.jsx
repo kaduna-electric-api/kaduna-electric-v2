@@ -16,7 +16,7 @@ export default function AboutSection() {
               <div className="text-center p-4 bg-primary-50 rounded-xl"><Zap className="w-8 h-8 text-primary-600 mx-auto mb-2"/><p className="font-bold text-2xl">24/7</p><p className="text-sm text-gray-600">Support</p></div>
             </div>
           </motion.div>
-          <motion.div initial={{ opacity: 0, x: 30 }} whileInView={{ opacity: 1, x: 0 }} viewport={{ once: true }} className="bg-gradient-to-br from-primary-100 to-blue-50 rounded-3xl p-12 flex items-center justify-center h-96">
+          <motion.div initial={{ opacity: 0, x: 30 }} whileInView={{ opacity: 1, x: 0 }} viewport={{ once: true }} className="bg-gradient-to-br from-primary-100 to-primary-50 rounded-3xl p-12 flex items-center justify-center h-96">
             <div className="text-center">
               <div className="w-24 h-24 bg-primary-600 rounded-full flex items-center justify-center mx-auto mb-4"><Zap className="w-12 h-12 text-white"/></div>
               <p className="text-primary-800 font-semibold text-lg">Trusted Infrastructure</p>

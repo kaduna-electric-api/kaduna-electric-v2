@@ -15,4 +15,7 @@ const transactionSchema = new mongoose.Schema({
   createdAt: { type: Date, default: Date.now }
 });
 
+// Ensure paystackRef uniqueness only when present (allow multiple nulls)
+transactionSchema.index({ paystackRef: 1 }, { unique: true, partialFilterExpression: { paystackRef: { $type: 'string' } } });
+
 module.exports = mongoose.model('Transaction', transactionSchema);

@@ -20,7 +20,7 @@ export default function AdminOverview() {
   if (loading) return <Loading fullScreen/>;
 
   const statCards = [
-    { icon: Users, label: 'Total Customers', value: stats?.stats?.totalCustomers || 0, color: 'bg-blue-50 text-blue-600' },
+    { icon: Users, label: 'Total Customers', value: stats?.stats?.totalCustomers || 0, color: 'bg-primary-50 text-primary-600' },
     { icon: CreditCard, label: 'Total Transactions', value: stats?.stats?.totalTransactions || 0, color: 'bg-purple-50 text-purple-600' },
     { icon: CheckCircle, label: 'Successful Payments', value: stats?.stats?.successfulPayments || 0, color: 'bg-green-50 text-green-600' },
     { icon: TrendingUp, label: 'Total Revenue', value: `₦${(stats?.stats?.totalRevenue || 0).toLocaleString()}`, color: 'bg-electric-50 text-electric-600' },

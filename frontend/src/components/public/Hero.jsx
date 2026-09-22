@@ -18,7 +18,7 @@ export default function Hero() {
           <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold leading-tight mb-6">
             Power Your Life.<br /><span className="text-electric-400">Pay With Ease.</span>
           </h1>
-          <p className="text-lg text-blue-100 mb-8 max-w-lg">
+          <p className="text-lg text-primary-100 mb-8 max-w-lg">
             Purchase prepaid electricity tokens securely, manage your meters, track transactions and get customer support — all from one platform.
           </p>
           <div className="flex flex-wrap gap-4">
@@ -37,7 +37,7 @@ export default function Hero() {
                 <div className="w-12 h-12 bg-electric-500 rounded-xl flex items-center justify-center">
                   <Zap className="w-6 h-6 text-white" />
                 </div>
-                <div><p className="font-semibold">Buy Token</p><p className="text-sm text-blue-200">Quick & Secure</p></div>
+                <div><p className="font-semibold">Buy Token</p><p className="text-sm text-primary-200">Quick & Secure</p></div>
               </div>
               <span className="text-electric-400 font-bold">₦5,000</span>
             </div>
