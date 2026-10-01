@@ -13,6 +13,8 @@ import NotFound from './pages/NotFound';
 // Auth
 import Login from './components/auth/Login';
 import Register from './components/auth/Register';
+import VerifyOtp from './components/auth/VerifyOtp';
+import CreatePassword from './components/auth/CreatePassword';
 import ForgotPassword from './components/auth/ForgotPassword';
 
 // Payment
@@ -50,6 +52,8 @@ function App() {
         <Route path="/how-it-works" element={<HowItWorks />} />
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
+        <Route path="/verify-otp" element={<VerifyOtp />} />
+        <Route path="/create-password" element={<CreatePassword />} />
         <Route path="/forgot-password" element={<ForgotPassword />} />
         <Route path="/dashboard/*" element={<PrivateRoute><Dashboard /></PrivateRoute>} />
         <Route path="/buy-token" element={<PrivateRoute><BuyToken /></PrivateRoute>} />

@@ -1,26 +1,45 @@
-const nodemailer = require('nodemailer');
+const { Resend } = require('resend');
+const path = require('path');
 
-const transporter = nodemailer.createTransport({
-  host: process.env.SMTP_HOST,
-  port: process.env.SMTP_PORT,
-  secure: false,
-  auth: {
-    user: process.env.SMTP_USER,
-    pass: process.env.SMTP_PASS
-  }
-});
+require('dotenv').config({ path: path.resolve(__dirname, '../../.env') });
+
+const getEmailSender = () => (
+  process.env.RESEND_FROM_EMAIL?.trim() || process.env.SMTP_FROM?.trim() || ''
+);
+
+const isEmailConfigured = () => Boolean(process.env.RESEND_API_KEY?.trim() && getEmailSender());
 
 const sendEmail = async (to, subject, html) => {
+  if (!isEmailConfigured()) {
+    console.error('Resend configuration is incomplete. Set RESEND_API_KEY and RESEND_FROM_EMAIL in the backend environment.');
+    return false;
+  }
+
   try {
-    await transporter.sendMail({
-      from: process.env.SMTP_FROM || 'Kaduna Electric <noreply@kadunaelectric.com>',
+    const resend = new Resend(process.env.RESEND_API_KEY.trim());
+    const { data, error } = await resend.emails.send({
+      from: getEmailSender(),
       to,
       subject,
       html
     });
-    return true;
+
+    if (error) {
+      console.error('Resend email send failed:', {
+        name: error.name,
+        statusCode: error.statusCode,
+        message: error.message
+      });
+      return false;
+    }
+
+    return Boolean(data?.id);
   } catch (error) {
-    console.error('Email send failed:', error.message);
+    console.error('Resend email send failed:', {
+      name: error.name,
+      statusCode: error.statusCode,
+      message: error.message
+    });
     return false;
   }
 };
@@ -58,4 +77,4 @@ const sendComplaintResponseEmail = async (to, reference, response) => {
   return await sendEmail(to, 'Complaint Response - Kaduna Electric', html);
 };
 
-module.exports = { sendEmail, sendTokenEmail, sendComplaintResponseEmail };
+module.exports = { sendEmail, sendTokenEmail, sendComplaintResponseEmail, isEmailConfigured };
