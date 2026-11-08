@@ -15,7 +15,13 @@ export default function PaymentSuccess() {
   useEffect(() => {
     if (reference) {
       api.get(`/payments/verify/${reference}`)
-        .then(res => setTransaction(res.data.transaction))
+        .then((res) => {
+          if (res.data.transaction?.paymentStatus === 'success') {
+            setTransaction(res.data.transaction);
+          } else {
+            toast.error('Payment is not confirmed yet. Check your transaction history shortly.');
+          }
+        })
         .catch(() => toast.error('Failed to verify payment'))
         .finally(() => setLoading(false));
     } else { setLoading(false); }
@@ -35,7 +41,8 @@ export default function PaymentSuccess() {
       <div className="section-padding max-w-lg mx-auto">
         <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} className="card text-center space-y-6">
           <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto"><Check className="w-10 h-10 text-green-600"/></div>
-          <div><h3 className="text-2xl font-bold text-green-700">Payment Successful</h3><p className="text-gray-600">Your token has been generated</p></div>
+          <div><h3 className="text-2xl font-bold text-green-700">Payment Successful</h3><p className="text-gray-600">Your sample token has been generated</p></div>
+          <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">Payments are simulated. This sample token cannot recharge a real electricity meter.</div>
           <div className="bg-gray-50 rounded-xl p-6 space-y-3 text-left">
             <div className="flex justify-between"><span className="text-gray-600">Meter</span><span className="font-medium">{transaction.meterNumber}</span></div>
             <div className="flex justify-between"><span className="text-gray-600">Amount</span><span className="font-medium">₦{transaction.amount.toLocaleString()}</span></div>

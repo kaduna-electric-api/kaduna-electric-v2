@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Routes, Route, Link, useLocation } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { LayoutDashboard, Zap, Receipt, MessageSquare, LogOut, Menu, X } from 'lucide-react';
+import { LayoutDashboard, Zap, MessageSquare, LogOut, Menu, X } from 'lucide-react';
 import useAuthStore from '../store/authStore';
 import CustomerDashboard from '../components/dashboard/CustomerDashboard';
 import MeterManager from '../components/meters/MeterManager';
@@ -9,7 +9,6 @@ import MeterManager from '../components/meters/MeterManager';
 const sidebarItems = [
   { icon: LayoutDashboard, label: 'Dashboard', path: '/dashboard' },
   { icon: Zap, label: 'Buy Token', path: '/buy-token' },
-  { icon: Receipt, label: 'Transactions', path: '/transactions' },
   { icon: MessageSquare, label: 'Complaints', path: '/complaints' },
 ];
 
@@ -25,7 +24,7 @@ export default function Dashboard() {
         <div className="p-6 border-b border-gray-100">
           <Link to="/" className="flex items-center gap-2">
             <div className="w-8 h-8 bg-primary-600 rounded-lg flex items-center justify-center"><Zap className="w-5 h-5 text-white"/></div>
-            <span className="font-bold text-lg text-primary-900">Kaduna Electric</span>
+            <span className="font-bold text-lg text-primary-900">King&apos;s Power</span>
           </Link>
         </div>
         <nav className="flex-1 p-4 space-y-1">
@@ -49,7 +48,7 @@ export default function Dashboard() {
       <div className="lg:hidden fixed top-0 left-0 right-0 bg-white border-b border-gray-200 z-50 px-4 h-16 flex items-center justify-between">
         <Link to="/" className="flex items-center gap-2">
           <div className="w-8 h-8 bg-primary-600 rounded-lg flex items-center justify-center"><Zap className="w-5 h-5 text-white"/></div>
-          <span className="font-bold text-primary-900">Kaduna Electric</span>
+          <span className="font-bold text-primary-900">King&apos;s Power</span>
         </Link>
         <button onClick={()=>setMobileOpen(!mobileOpen)}>{mobileOpen?<X className="w-6 h-6"/>:<Menu className="w-6 h-6"/>}</button>
       </div>

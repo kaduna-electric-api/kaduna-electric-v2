@@ -118,7 +118,7 @@ test('Resend configuration accepts the existing SMTP sender setting', () => {
   const previousValues = Object.fromEntries(resendKeys.map((key) => [key, process.env[key]]));
   process.env.RESEND_API_KEY = 'test-resend-key';
   delete process.env.RESEND_FROM_EMAIL;
-  process.env.SMTP_FROM = 'Kaduna Electric <verify@example.com>';
+  process.env.SMTP_FROM = "King's Power <verify@example.com>";
 
   try {
     assert.equal(emailService.isEmailConfigured(), true);
@@ -215,8 +215,9 @@ test('verifyOtp returns a password setup token without activating the account', 
   const originalUserFindOne = User.findOne;
   const originalDeleteOne = RegistrationRequest.deleteOne;
   let pendingUser;
+  let verificationRequest;
 
-  RegistrationRequest.findOne = async () => ({
+  RegistrationRequest.findOne = async () => (verificationRequest = {
     email: 'test@kadunaelectric.com',
     otpHash: '9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08',
     otpExpires: new Date(Date.now() + 60 * 1000),
@@ -254,6 +255,9 @@ test('verifyOtp returns a password setup token without activating the account', 
     assert.equal(res.payload.success, true);
     assert.equal(pendingUser.isEmailVerified, true);
     assert.equal(pendingUser.isActive, false);
+    const claims = jwt.verify(res.payload.verificationToken, process.env.JWT_SECRET || 'kaduna-electric-dev-secret');
+    assert.equal(typeof claims.setupNonce, 'string');
+    assert.equal(verificationRequest.passwordSetupNonceHash, crypto.createHash('sha256').update(claims.setupNonce).digest('hex'));
   } finally {
     RegistrationRequest.findOne = originalFindOne;
     User.findOne = originalUserFindOne;
@@ -261,10 +265,36 @@ test('verifyOtp returns a password setup token without activating the account', 
   }
 });
 
+test('verifyOtp never issues a password setup token for an already verified request', async () => {
+  const originalFindOne = RegistrationRequest.findOne;
+  const request = {
+    isVerified: true,
+    isUsed: true
+  };
+  RegistrationRequest.findOne = async () => request;
+
+  try {
+    const req = { body: { email: 'test@kadunaelectric.com', otp: '123456' } };
+    const res = {
+      status(code) { this.statusCode = code; return this; },
+      json(payload) { this.payload = payload; return this; }
+    };
+
+    await verifyOtp(req, res);
+
+    assert.equal(res.statusCode, 400);
+    assert.equal(res.payload.verificationToken, undefined);
+    assert.match(res.payload.message, /Request a new verification code/i);
+  } finally {
+    RegistrationRequest.findOne = originalFindOne;
+  }
+});
+
 test('setPassword activates the account only when passwords match', async () => {
   const originalFindOneUser = User.findOne;
   const originalFindOneRequest = RegistrationRequest.findOne;
   const originalDeleteOne = RegistrationRequest.deleteOne;
+  const setupNonce = 'verified-otp-setup-nonce';
   const pendingUser = {
     _id: 'pending-user',
     firstName: 'Jane',
@@ -279,13 +309,14 @@ test('setPassword activates the account only when passwords match', async () => 
   RegistrationRequest.findOne = async () => ({
     isVerified: true,
     verifiedAt: new Date(),
+    passwordSetupNonceHash: crypto.createHash('sha256').update(setupNonce).digest('hex'),
     userData: { firstName: 'Jane', lastName: 'Doe' }
   });
   RegistrationRequest.deleteOne = async () => ({ deletedCount: 1 });
 
   try {
     const verificationToken = jwt.sign(
-      { email: pendingUser.email, purpose: 'registration-password-setup' },
+      { email: pendingUser.email, purpose: 'registration-password-setup', setupNonce },
       process.env.JWT_SECRET || 'kaduna-electric-dev-secret',
       { expiresIn: '15m' }
     );
@@ -311,6 +342,44 @@ test('setPassword activates the account only when passwords match', async () => 
     User.findOne = originalFindOneUser;
     RegistrationRequest.findOne = originalFindOneRequest;
     RegistrationRequest.deleteOne = originalDeleteOne;
+  }
+});
+
+test('setPassword rejects setup tokens that are not tied to a successful OTP verification', async () => {
+  const originalFindOneUser = User.findOne;
+  const originalFindOneRequest = RegistrationRequest.findOne;
+  User.findOne = async () => {
+    throw new Error('an invalid setup token must not look up or activate the user');
+  };
+  RegistrationRequest.findOne = async () => ({
+    isVerified: true,
+    passwordSetupNonceHash: crypto.createHash('sha256').update('legitimate-nonce').digest('hex')
+  });
+
+  try {
+    const verificationToken = jwt.sign(
+      { email: 'test@kadunaelectric.com', purpose: 'registration-password-setup' },
+      process.env.JWT_SECRET || 'kaduna-electric-dev-secret',
+      { expiresIn: '15m' }
+    );
+    const req = { body: {
+      email: 'test@kadunaelectric.com',
+      password: 'StrongPass123!',
+      confirmPassword: 'StrongPass123!',
+      verificationToken
+    } };
+    const res = {
+      status(code) { this.statusCode = code; return this; },
+      json(payload) { this.payload = payload; return this; }
+    };
+
+    await setPassword(req, res);
+
+    assert.equal(res.statusCode, 401);
+    assert.match(res.payload.message, /Email verification is invalid/i);
+  } finally {
+    User.findOne = originalFindOneUser;
+    RegistrationRequest.findOne = originalFindOneRequest;
   }
 });
 
@@ -448,7 +517,59 @@ test('resendOtp enforces the 60-second cooldown', async () => {
   }
 });
 
-test('unverified users cannot log in and are offered code resend', async () => {
+test('resendOtp requires a fresh code before verified inactive accounts can set a password', async () => {
+  const originalFindOneRequest = RegistrationRequest.findOne;
+  const originalFindOneAndUpdate = RegistrationRequest.findOneAndUpdate;
+  const originalFindOneUser = User.findOne;
+  const originalSendEmail = emailService.sendEmail;
+  let updatedRequest;
+  let sentEmailHtml;
+
+  RegistrationRequest.findOne = async () => ({ resendCooldownUntil: new Date(Date.now() - 1000) });
+  RegistrationRequest.findOneAndUpdate = async (filter, update) => {
+    updatedRequest = update;
+    return {
+      ...update,
+      save: async () => ({})
+    };
+  };
+  User.findOne = async () => ({
+    email: 'pending@example.com',
+    firstName: 'Jane',
+    lastName: 'Doe',
+    phone: '08012345678',
+    isEmailVerified: true,
+    isActive: false
+  });
+  emailService.sendEmail = async (to, subject, html) => {
+    sentEmailHtml = html;
+    return true;
+  };
+
+  try {
+    const req = { body: { email: 'pending@example.com' } };
+    const res = {
+      status(code) { this.statusCode = code; return this; },
+      json(payload) { this.payload = payload; return this; }
+    };
+
+    await resendOtp(req, res);
+
+    assert.equal(res.statusCode, 200);
+    assert.equal(res.payload.passwordSetupRequired, undefined);
+    assert.equal(res.payload.verificationToken, undefined);
+    assert.equal(updatedRequest.isVerified, false);
+    assert.equal(updatedRequest.isUsed, false);
+    assert.match(sentEmailHtml, /verification code is: <strong>\d{6}<\/strong>/i);
+  } finally {
+    RegistrationRequest.findOne = originalFindOneRequest;
+    RegistrationRequest.findOneAndUpdate = originalFindOneAndUpdate;
+    User.findOne = originalFindOneUser;
+    emailService.sendEmail = originalSendEmail;
+  }
+});
+
+test('new unverified registrations must finish verification before login', async () => {
   const originalFindOne = User.findOne;
   User.findOne = async () => ({
     email: 'pending@example.com',
@@ -474,9 +595,43 @@ test('unverified users cannot log in and are offered code resend', async () => {
   }
 });
 
+test('active existing users can sign in without another email verification', async () => {
+  const originalFindOne = User.findOne;
+  const originalJwtSecret = process.env.JWT_SECRET;
+  process.env.JWT_SECRET = 'test-secret';
+  User.findOne = async () => ({
+    _id: 'existing-user',
+    email: 'existing@example.com',
+    firstName: 'Existing',
+    lastName: 'User',
+    role: 'customer',
+    isActive: true,
+    isEmailVerified: false,
+    matchPassword: async (password) => password === 'StrongPass123!'
+  });
+
+  try {
+    const req = { body: { email: 'existing@example.com', password: 'StrongPass123!' } };
+    const res = {
+      status(code) { this.statusCode = code; return this; },
+      json(payload) { this.payload = payload; return this; }
+    };
+
+    await login(req, res);
+
+    assert.equal(res.statusCode, undefined);
+    assert.ok(res.payload.token);
+    assert.equal(res.payload.user.email, 'existing@example.com');
+  } finally {
+    User.findOne = originalFindOne;
+    if (originalJwtSecret === undefined) delete process.env.JWT_SECRET;
+    else process.env.JWT_SECRET = originalJwtSecret;
+  }
+});
+
 test('returns an error instead of exposing a dev OTP when email delivery is unavailable', async () => {
   process.env.RESEND_API_KEY = 'test-resend-key';
-  process.env.RESEND_FROM_EMAIL = 'Kaduna Electric <verify@example.com>';
+  process.env.RESEND_FROM_EMAIL = "King's Power <verify@example.com>";
 
   const originalFindOneUser = User.findOne;
   const originalCreate = User.create;

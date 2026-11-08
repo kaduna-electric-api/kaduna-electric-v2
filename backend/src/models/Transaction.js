@@ -8,8 +8,9 @@ const transactionSchema = new mongoose.Schema({
   units: { type: Number, required: true },
   token: { type: String, required: true, unique: true },
   transactionRef: { type: String, required: true, unique: true },
-  paymentMethod: { type: String, enum: ['demo', 'paystack', 'card', 'transfer'], default: 'demo' },
+  paymentMethod: { type: String, enum: ['demo', 'paystack', 'card', 'transfer', 'credit'], default: 'demo' },
   paymentStatus: { type: String, enum: ['pending', 'success', 'failed'], default: 'pending' },
+  creditStatus: { type: String, enum: ['none', 'unpaid', 'paid'], default: 'none' },
   paystackRef: { type: String },
   receiptUrl: { type: String },
   createdAt: { type: Date, default: Date.now }

@@ -2,23 +2,77 @@ const Transaction = require('../models/Transaction');
 const PDFDocument = require('pdfkit');
 const { generateReceipt } = require('../utils/receiptGenerator');
 const User = require('../models/User');
+const mongoose = require('mongoose');
 
 exports.getHistory = async (req, res) => {
   try {
-    const page = parseInt(req.query.page) || 1;
-    const limit = parseInt(req.query.limit) || 10;
+    const page = Math.max(1, parseInt(req.query.page, 10) || 1);
+    const limit = Math.min(100, Math.max(1, parseInt(req.query.limit, 10) || 10));
     const skip = (page - 1) * limit;
+    const query = { user: req.user.id };
+    const { search, status } = req.query;
 
-    const transactions = await Transaction.find({ user: req.user.id })
+    if (typeof search === 'string' && search.trim()) {
+      if (search.trim().length > 100) {
+        return res.status(400).json({ message: 'Search must be 100 characters or fewer.' });
+      }
+      const escapedSearch = search.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      query.$or = [
+        { meterNumber: { $regex: escapedSearch, $options: 'i' } },
+        { transactionRef: { $regex: escapedSearch, $options: 'i' } }
+      ];
+    }
+
+    if (status && status !== 'all') {
+      if (['success', 'pending', 'failed'].includes(status)) {
+        query.paymentStatus = status;
+        if (status === 'success') query.paymentMethod = { $ne: 'credit' };
+      } else if (status === 'credit-due' || status === 'credit-paid') {
+        query.paymentMethod = 'credit';
+        query.creditStatus = status === 'credit-due' ? 'unpaid' : 'paid';
+      } else {
+        return res.status(400).json({ message: 'Unsupported transaction status filter.' });
+      }
+    }
+
+    const [transactions, total, summary] = await Promise.all([
+      Transaction.find(query)
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(limit)
-      .populate('meter', 'nickname');
-
-    const total = await Transaction.countDocuments({ user: req.user.id });
+      .populate('meter', 'nickname address'),
+      Transaction.countDocuments(query),
+      Transaction.aggregate([
+        { $match: { user: new mongoose.Types.ObjectId(req.user.id) } },
+        {
+          $group: {
+            _id: null,
+            totalTransactions: { $sum: 1 },
+            totalSpent: {
+              $sum: {
+                $cond: [
+                  {
+                    $and: [
+                      { $eq: ['$paymentStatus', 'success'] },
+                      { $ne: ['$paymentMethod', 'credit'] }
+                    ]
+                  },
+                  '$amount',
+                  0
+                ]
+              }
+            }
+          }
+        }
+      ])
+    ]);
 
     res.json({
       transactions,
+      summary: {
+        totalTransactions: summary[0]?.totalTransactions || 0,
+        totalSpent: summary[0]?.totalSpent || 0
+      },
       pagination: {
         page,
         limit,

@@ -5,8 +5,8 @@ import Footer from '../components/public/Footer';
 const steps = [
   { icon: UserPlus, title: 'Create Account', desc: 'Sign up in seconds with your email and phone number.' },
   { icon: Plus, title: 'Add Your Meter', desc: 'Register your prepaid meter number. Add multiple meters.' },
-  { icon: CreditCard, title: 'Make Payment', desc: 'Enter amount and pay securely via Paystack.' },
-  { icon: Key, title: 'Get Your Token', desc: 'Your token is generated instantly after payment.' },
+  { icon: CreditCard, title: 'Choose Payment', desc: 'Enter an amount and select simulated payment or Paystack test checkout.' },
+  { icon: Key, title: 'View Your Sample Token', desc: 'A generated sample token appears after purchase; it cannot recharge a real meter.' },
 ];
 
 export default function HowItWorks() {
@@ -43,7 +43,7 @@ export default function HowItWorks() {
           <motion.div initial={{ opacity: 0 }} whileInView={{ opacity: 1 }} viewport={{ once: true }}>
             <CheckCircle className="w-16 h-16 text-green-600 mx-auto mb-6"/>
             <h2 className="text-3xl font-bold mb-4">That's It!</h2>
-            <p className="text-gray-600 mb-8">No more queues. No more paper tokens. Everything is digital, secure, and instant.</p>
+            <p className="text-gray-600 mb-8">Manage meter accounts and purchase activity in one place. Payments and generated tokens are simulated.</p>
             <a href="/register" className="btn-primary inline-block">Get Started Now</a>
           </motion.div>
         </div>

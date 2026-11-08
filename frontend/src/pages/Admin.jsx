@@ -1,15 +1,17 @@
 import { useState } from 'react';
 import { Routes, Route, Link, useLocation } from 'react-router-dom';
-import { LayoutDashboard, Users, CreditCard, MessageSquare, LogOut, Menu, X, Shield } from 'lucide-react';
+import { LayoutDashboard, Users, CreditCard, MessageSquare, LogOut, Menu, X, Shield, Zap } from 'lucide-react';
 import useAuthStore from '../store/authStore';
 import AdminOverview from '../components/admin/AdminOverview';
 import AdminUsers from '../components/admin/AdminUsers';
 import AdminTransactions from '../components/admin/AdminTransactions';
 import AdminComplaints from '../components/admin/AdminComplaints';
+import AdminApprovedMeters from '../components/admin/AdminApprovedMeters';
 
 const sidebarItems = [
   { icon: LayoutDashboard, label: 'Dashboard', path: '/admin' },
   { icon: Users, label: 'Users', path: '/admin/users' },
+  { icon: Zap, label: 'Meters', path: '/admin/meters' },
   { icon: CreditCard, label: 'Transactions', path: '/admin/transactions' },
   { icon: MessageSquare, label: 'Complaints', path: '/admin/complaints' },
 ];
@@ -60,6 +62,7 @@ export default function Admin() {
         <Routes>
           <Route path="/" element={<AdminOverview/>}/>
           <Route path="/users" element={<AdminUsers/>}/>
+          <Route path="/meters" element={<AdminApprovedMeters/>}/>
           <Route path="/transactions" element={<AdminTransactions/>}/>
           <Route path="/complaints" element={<AdminComplaints/>}/>
         </Routes>

@@ -16,7 +16,7 @@ export default function AuthShell({ children, step, mode = 'signup' }) {
         <aside className="auth-showcase">
           <div className="auth-brand">
             <span className="auth-brand-icon"><Zap size={18} fill="currentColor" /></span>
-            <span>Kaduna Electric</span>
+            <span>King&apos;s Power</span>
           </div>
 
           <div className="auth-showcase-copy">
@@ -40,7 +40,7 @@ export default function AuthShell({ children, step, mode = 'signup' }) {
               <div className="auth-art-bolt"><Zap size={20} fill="currentColor" /></div>
               <div>
                 <strong>Always connected</strong>
-                <span>POWERING KADUNA</span>
+                <span>POWERING YOUR DAY</span>
               </div>
               <ArrowUpRight className="auth-art-arrow" size={18} />
             </div>

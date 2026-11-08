@@ -1,6 +1,6 @@
-# ⚡ Kaduna Electric Token Vending System v2.0
+# King's Power
 
-A production-ready, full-stack web application for purchasing prepaid electricity tokens. Built with **Node.js**, **Express**, **MongoDB**, **React 18**, **Tailwind CSS**, and **Paystack** payment integration.
+A full-stack demonstration of a prepaid electricity token experience. Payments and generated tokens are simulated; no real meter can be recharged. Built with **Node.js**, **Express**, **MongoDB**, **React 18**, **Tailwind CSS**, and optional **Paystack test mode**.
 
 ---
 
@@ -8,7 +8,7 @@ A production-ready, full-stack web application for purchasing prepaid electricit
 
 ### Public Website
 - **Professional Home Page** — Hero section with animated electricity effects, feature showcase, how-it-works, about section, FAQs, and CTA
-- **About Us Page** — Company story, mission, values, and statistics
+- **About Us Page** — Product overview and clear demo disclosures
 - **How It Works Page** — Step-by-step guide with visual flow
 - **Fully Responsive** — Works on desktop, tablet, and mobile
 - **Smooth Animations** — Framer Motion powered transitions
@@ -17,8 +17,11 @@ A production-ready, full-stack web application for purchasing prepaid electricit
 - **Professional Dashboard** — Stats cards, quick actions, recent transactions
 - **Animated Counters** — Numbers animate on scroll
 - **Meter Management** — Add, view, and remove multiple meters
-- **Token Purchase Flow** — 4-step wizard: Select Meter → Enter Amount → Confirm → Payment → Success
-- **Demo Payment Mode** — Safe for school presentations (shows "DEMO" badge)
+- **Token Purchase Flow** — Guided meter-to-token demo purchase
+- **Purchase Limit** — Whole naira amounts from ₦100 to ₦10,000, enforced by the API
+- **Demo Payment Mode** — Simulated payments by default; Paystack test keys are supported
+- **Demo Credit** — Customers can make one sample-token purchase on credit up to ₦10,000, then must record a simulated full repayment before borrowing again
+- **Sample Token Warning** — Generated sample tokens are clearly marked as not valid for real meters
 - **Transaction History** — Paginated table with PDF receipt downloads
 - **Complaint System** — Submit complaints with unique reference numbers (CMP-YYYYMMDD-XXXXX), track status (Pending → Under Review → Resolved)
 
@@ -49,9 +52,9 @@ A production-ready, full-stack web application for purchasing prepaid electricit
 | **Frontend** | React 18 + Vite + Tailwind CSS + Zustand + Framer Motion + Recharts |
 | **Backend** | Node.js 20 + Express.js |
 | **Database** | MongoDB Atlas (Mongoose ODM) |
-| **Payments** | Paystack (Nigeria) + Demo Mode |
+| **Payments** | Simulated demo + optional Paystack test mode only |
 | **PDF** | PDFKit |
-| **Email** | Nodemailer (SMTP) |
+| **Email** | Resend (optional) |
 
 ---
 
@@ -82,18 +85,16 @@ MONGODB_URI=mongodb+srv://username:password@cluster.mongodb.net/kaduna-electric
 # JWT
 JWT_SECRET=your-super-secret-key-min-32-characters-long
 
-# Payment Mode: demo | paystack
+# Payment Mode: demo | paystack (test keys only)
 PAYMENT_MODE=demo
 
-# Paystack (only needed for live mode)
+# Optional Paystack sandbox configuration (live keys are rejected)
 PAYSTACK_SECRET_KEY=sk_test_...
 PAYSTACK_PUBLIC_KEY=pk_test_...
 
-# Email SMTP
-SMTP_HOST=smtp.gmail.com
-SMTP_PORT=587
-SMTP_USER=your-email@gmail.com
-SMTP_PASS=your-app-password
+# Email (optional; Resend is used when configured)
+RESEND_API_KEY=re_your_resend_api_key
+RESEND_FROM_EMAIL=King's Power <verify@your-verified-domain.com>
 
 # Admin Setup Key
 ADMIN_SECRET_KEY=your-admin-secret-key
@@ -103,6 +104,16 @@ Start server:
 ```bash
 npm run dev
 ```
+
+### Optional synthetic meter fixtures
+
+The backend includes 30 clearly labeled synthetic meter numbers for isolated development/testing. They are not real utility meters and cannot be used to recharge electricity. To add them to a non-production MongoDB database whose name contains `dev`, `development`, `test`, or `testing`, configure that database in `MONGODB_URI`, then explicitly run:
+
+```bash
+ALLOW_TEST_METER_SEED=true npm run seed:test-meters
+```
+
+The seeder refuses production mode, requires the explicit opt-in, checks the connected database name, and only inserts the fixtures if they are not already present. For an explicitly authorized non-production database without a test-style name, also set `ALLOW_TEST_METER_SEED_DATABASE` to the exact database name. Never use this for production.
 
 ### 2. Frontend Setup
 
@@ -125,15 +136,24 @@ npm run dev
 
 App runs at: `http://localhost:5173`
 
+### Admin-approved meter registry
+
+1. Sign in with an administrator account and open **Admin → Meters**.
+2. Add the exact 11–13 digit meter numbers customers are allowed to use.
+3. Customers can then add only active numbers from that registry under **Dashboard → Meters**.
+4. Disabling a registry entry hides it from customer accounts and blocks new token purchases; re-enable it to restore access.
+
+Admins must verify meter ownership/validity before adding a number. The demo does not connect to a utility meter-validation service.
+
 ---
 
 ## 🧪 Testing
 
-### Demo Payment (Default)
-The app runs in DEMO mode by default. Payments process instantly without real money.
+### Demo Payment and Credit
+The app runs in DEMO mode by default. Payments and debt repayments are simulated without collecting real money. A customer can have one outstanding demo-credit purchase of up to ₦10,000; the full balance must be cleared in the dashboard before another credit purchase. Credit records are not included in cash revenue.
 
 ### Paystack Test Card
-If you switch to `PAYMENT_MODE=paystack`:
+If you switch to `PAYMENT_MODE=paystack` and configure Paystack test keys:
 - **Card:** `4084084084084081`
 - **CVV:** `000`
 - **Expiry:** Any future date
@@ -219,6 +239,12 @@ kaduna-electric-v2/
 | GET | `/api/payments/verify/:ref` | Verify payment |
 | POST | `/api/payments/webhook` | Paystack webhook |
 
+### Demo Credit
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/credit/account` | Get the customer's demo-credit balance and repayment history |
+| POST | `/api/credit/repay` | Simulate full repayment of the outstanding demo-credit balance |
+
 ### Transactions
 | Method | Endpoint | Description |
 |--------|----------|-------------|
@@ -269,17 +295,13 @@ app.use(cors({
 
 ---
 
-## 🔐 Security Checklist
+## 🔐 Demo Safety
 
-- [ ] Change default JWT secret to 32+ random characters
-- [ ] Use strong MongoDB password
-- [ ] Enable Paystack webhook signature verification
-- [ ] Set up rate limiting (already configured)
-- [ ] Use HTTPS in production
-- [ ] Store `.env` files securely (never commit)
-- [ ] Enable MongoDB IP whitelist
-- [ ] Set strong ADMIN_SECRET_KEY
-- [ ] Regular database backups
+- Payments default to simulated demo mode.
+- Paystack integration accepts only secret keys beginning with `sk_test_`; live keys are rejected.
+- Purchases are capped at ₦10,000 and must be whole naira amounts.
+- Generated token values and estimated units are for demonstration only. Do not use them to recharge a real meter.
+- Keep `.env` files out of version control and use strong local secrets.
 
 ---
 
@@ -287,4 +309,4 @@ app.use(cors({
 
 MIT License — Free for personal and commercial use.
 
-Built with ❤️ for Kaduna Electric customers.
+Built for the King's Power prepaid electricity experience.

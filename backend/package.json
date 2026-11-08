@@ -1,12 +1,13 @@
 {
   "name": "kaduna-electric-backend",
   "version": "2.0.0",
-  "description": "Kaduna Electric Token Vending System API v2.0",
+  "description": "King's Power token vending API",
   "main": "src/app.js",
   "scripts": {
     "start": "node src/app.js",
     "dev": "nodemon src/app.js",
-    "test": "node --test tests/**/*.test.js"
+    "test": "node --test tests/**/*.test.js",
+    "seed:test-meters": "node scripts/seed-test-meters.js"
   },
   "dependencies": {
     "axios": "^1.6.2",

@@ -55,7 +55,7 @@ export default function AdminTransactions() {
                   <td className="py-3 px-4 text-white text-sm">{t.user?.firstName} {t.user?.lastName}</td>
                   <td className="py-3 px-4 text-slate-300 text-sm font-mono">{t.meterNumber}</td>
                   <td className="py-3 px-4 text-white text-sm font-medium">₦{t.amount.toLocaleString()}</td>
-                  <td className="py-3 px-4"><span className={`text-xs px-2 py-1 rounded-full ${t.paymentStatus==='success'?'bg-green-900 text-green-400':'bg-red-900 text-red-400'}`}>{t.paymentStatus}</span></td>
+                  <td className="py-3 px-4"><span className={`text-xs px-2 py-1 rounded-full ${t.paymentMethod === 'credit' && t.creditStatus === 'unpaid' ? 'bg-amber-900 text-amber-300' : t.paymentStatus === 'success' ? 'bg-green-900 text-green-400' : 'bg-red-900 text-red-400'}`}>{t.paymentMethod === 'credit' ? (t.creditStatus === 'paid' ? 'credit repaid' : 'credit due') : t.paymentStatus}</span></td>
                   <td className="py-3 px-4 text-slate-300 text-sm capitalize">{t.paymentMethod}</td>
                 </tr>
               ))}

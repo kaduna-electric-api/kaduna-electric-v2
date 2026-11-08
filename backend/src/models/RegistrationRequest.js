@@ -37,6 +37,10 @@ const registrationRequestSchema = new mongoose.Schema({
     type: Boolean,
     default: false
   },
+  passwordSetupNonceHash: {
+    type: String,
+    default: null
+  },
   resendCooldownUntil: {
     type: Date,
     default: Date.now

@@ -20,7 +20,7 @@ const generateRegistrationOTP = () => {
 
 const buildOtpEmailHtml = (otp) => `
   <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-    <h2 style="color: #1a365d;">Kaduna Electric - Account Verification</h2>
+    <h2 style="color: #1a365d;">King's Power - Account Verification</h2>
     <p>Your verification code is: <strong>${otp}</strong> &mdash; it expires in 3 minutes.</p>
   </div>
 `;
@@ -52,6 +52,7 @@ const createPendingRegistration = async ({ email, firstName = '', lastName = '',
       maxAttempts: 5,
       isUsed: false,
       isVerified: false,
+      passwordSetupNonceHash: null,
       verifiedAt: null,
       resendCooldownUntil
     },
@@ -63,7 +64,7 @@ const createPendingRegistration = async ({ email, firstName = '', lastName = '',
 
 const sendRegistrationOtp = async ({ email, firstName, lastName, phone }) => {
   const { otp, request } = await createPendingRegistration({ email, firstName, lastName, phone });
-  const emailSent = await emailService.sendEmail(email, 'Kaduna Electric Registration Verification', buildOtpEmailHtml(otp));
+  const emailSent = await emailService.sendEmail(email, "King's Power Registration Verification", buildOtpEmailHtml(otp));
 
   if (!emailSent && request?.save) {
     request.resendCooldownUntil = new Date();
@@ -154,16 +155,8 @@ exports.verifyOtp = async (req, res) => {
     }
 
     if (verificationRequest.isVerified) {
-      const verificationToken = jwt.sign(
-        { email, purpose: 'registration-password-setup' },
-        process.env.JWT_SECRET || 'kaduna-electric-dev-secret',
-        { expiresIn: '15m' }
-      );
-      return res.status(200).json({
-        success: true,
-        message: 'Email already verified. Please create your password.',
-        verificationToken,
-        email
+      return res.status(400).json({
+        message: 'Email already verified. Request a new verification code to continue account setup.'
       });
     }
 
@@ -205,13 +198,15 @@ exports.verifyOtp = async (req, res) => {
     user.isEmailVerified = true;
     user.emailVerifiedAt = new Date();
     await user.save();
+    const passwordSetupNonce = crypto.randomBytes(32).toString('hex');
     verificationRequest.isVerified = true;
     verificationRequest.verifiedAt = user.emailVerifiedAt;
     verificationRequest.isUsed = true;
+    verificationRequest.passwordSetupNonceHash = hashOTP(passwordSetupNonce);
     await verificationRequest.save();
 
     const verificationToken = jwt.sign(
-      { email, purpose: 'registration-password-setup' },
+      { email, purpose: 'registration-password-setup', setupNonce: passwordSetupNonce },
       process.env.JWT_SECRET || 'kaduna-electric-dev-secret',
       { expiresIn: '15m' }
     );
@@ -240,22 +235,7 @@ exports.resendOtp = async (req, res) => {
       return res.status(400).json({ message: 'No unverified account was found for this email.' });
     }
 
-    if (user.isEmailVerified && !user.isActive && request?.isVerified) {
-      const verificationToken = jwt.sign(
-        { email, purpose: 'registration-password-setup' },
-        process.env.JWT_SECRET || 'kaduna-electric-dev-secret',
-        { expiresIn: '15m' }
-      );
-      return res.status(200).json({
-        success: true,
-        passwordSetupRequired: true,
-        verificationToken,
-        email,
-        message: 'Email already verified. Please create your password.'
-      });
-    }
-
-    if (user.isEmailVerified || !request) {
+    if (user.isActive || !request) {
       return res.status(400).json({ message: 'No unverified account was found for this email.' });
     }
 
@@ -316,6 +296,13 @@ exports.setPassword = async (req, res) => {
     if (!registrationRequest?.isVerified) {
       return res.status(400).json({ message: 'Please verify your email before creating a password.' });
     }
+    if (
+      typeof claims.setupNonce !== 'string'
+      || !registrationRequest.passwordSetupNonceHash
+      || hashOTP(claims.setupNonce) !== registrationRequest.passwordSetupNonceHash
+    ) {
+      return res.status(401).json({ message: 'Email verification is invalid. Please verify your email again.' });
+    }
 
     const user = await User.findOne({ email });
     if (!user || user.isActive) {
@@ -354,25 +341,28 @@ exports.login = async (req, res) => {
     if (!user) {
       return res.status(401).json({ message: 'Invalid email or password' });
     }
-    if (!user.isEmailVerified) {
-      return res.status(403).json({
-        code: 'EMAIL_NOT_VERIFIED',
-        email: user.email,
-        message: 'Please verify your email before signing in. You can resend your verification code.'
-      });
-    }
     if (!user.isActive) {
+      if (!user.isEmailVerified) {
+        return res.status(403).json({
+          code: 'EMAIL_NOT_VERIFIED',
+          email: user.email,
+          message: 'Please complete email verification to finish creating your account.'
+        });
+      }
+
+      const registrationRequest = await RegistrationRequest.findOne({ email });
+      if (!registrationRequest?.isVerified) {
+        return res.status(403).json({ message: 'Account is deactivated. Contact support for assistance.' });
+      }
+
       return res.status(403).json({
         code: 'PASSWORD_SETUP_REQUIRED',
         email: user.email,
-        message: 'Your email is verified. Finish creating your password to activate your account.'
+        message: 'Finish creating your password to activate your account.'
       });
     }
     if (!(await user.matchPassword(password))) {
       return res.status(401).json({ message: 'Invalid email or password' });
-    }
-    if (!user.isActive) {
-      return res.status(401).json({ message: 'Account is deactivated' });
     }
     res.json({
       token: generateToken(user._id),
@@ -414,6 +404,11 @@ exports.updateProfile = async (req, res) => {
 
 exports.forgotPassword = async (req, res) => {
   try {
+    const frontendUrl = (process.env.FRONTEND_URL || '').split(',')[0].trim().replace(/\/+$/, '');
+    if (!frontendUrl && process.env.NODE_ENV === 'production') {
+      return res.status(503).json({ message: 'Password reset is temporarily unavailable. Please try again later.' });
+    }
+
     const email = normalizeEmail(req.body.email);
     const user = await User.findOne({ email });
     if (!user) {
@@ -424,12 +419,19 @@ exports.forgotPassword = async (req, res) => {
     user.resetPasswordExpire = Date.now() + 30 * 60 * 1000;
     await user.save();
 
-    const resetUrl = `${process.env.FRONTEND_URL}/reset-password/${resetToken}`;
-    await emailService.sendEmail(
+    const resetUrl = `${frontendUrl || 'http://localhost:5173'}/reset-password/${resetToken}`;
+    const emailSent = await emailService.sendEmail(
       user.email,
-      'Password Reset - Kaduna Electric',
+      "Password Reset - King's Power",
       `<p>Click <a href="${resetUrl}">here</a> to reset your password. Link expires in 30 minutes.</p>`
     );
+    if (!emailSent) {
+      user.resetPasswordToken = undefined;
+      user.resetPasswordExpire = undefined;
+      await user.save();
+      return res.status(502).json({ message: 'Unable to send password reset email. Please try again later.' });
+    }
+
     res.json({ message: 'Password reset email sent' });
   } catch (error) {
     res.status(500).json({ message: error.message });

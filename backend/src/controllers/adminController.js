@@ -1,16 +1,25 @@
 const User = require('../models/User');
 const Meter = require('../models/Meter');
+const ApprovedMeter = require('../models/ApprovedMeter');
 const Transaction = require('../models/Transaction');
+const CreditAccount = require('../models/CreditAccount');
 const Complaint = require('../models/Complaint');
+const { normalizeMeterNumber, isValidMeterNumber } = require('../utils/meterNumber');
 
 exports.getDashboardStats = async (req, res) => {
   try {
     const totalCustomers = await User.countDocuments({ role: 'customer' });
     const totalTransactions = await Transaction.countDocuments();
-    const successfulPayments = await Transaction.countDocuments({ paymentStatus: 'success' });
+    const successfulPayments = await Transaction.countDocuments({
+      paymentStatus: 'success',
+      paymentMethod: { $ne: 'credit' }
+    });
     const totalRevenue = await Transaction.aggregate([
-      { $match: { paymentStatus: 'success' } },
+      { $match: { paymentStatus: 'success', paymentMethod: { $ne: 'credit' } } },
       { $group: { _id: null, total: { $sum: '$amount' } } }
+    ]);
+    const outstandingCredit = await CreditAccount.aggregate([
+      { $group: { _id: null, total: { $sum: '$balance' } } }
     ]);
     const pendingComplaints = await Complaint.countDocuments({ status: 'Pending' });
     const newUsersThisMonth = await User.countDocuments({
@@ -22,7 +31,7 @@ exports.getDashboardStats = async (req, res) => {
     const last7Days = new Date();
     last7Days.setDate(last7Days.getDate() - 7);
     const revenueByDay = await Transaction.aggregate([
-      { $match: { paymentStatus: 'success', createdAt: { $gte: last7Days } } },
+      { $match: { paymentStatus: 'success', paymentMethod: { $ne: 'credit' }, createdAt: { $gte: last7Days } } },
       {
         $group: {
           _id: { $dateToString: { format: '%Y-%m-%d', date: '$createdAt' } },
@@ -35,6 +44,7 @@ exports.getDashboardStats = async (req, res) => {
 
     // Transactions by status
     const transactionsByStatus = await Transaction.aggregate([
+      { $match: { paymentMethod: { $ne: 'credit' } } },
       { $group: { _id: '$paymentStatus', count: { $sum: 1 } } }
     ]);
 
@@ -44,6 +54,7 @@ exports.getDashboardStats = async (req, res) => {
         totalTransactions,
         successfulPayments,
         totalRevenue: totalRevenue[0]?.total || 0,
+        outstandingCredit: outstandingCredit[0]?.total || 0,
         pendingComplaints,
         newUsersThisMonth
       },
@@ -115,6 +126,91 @@ exports.getAllMeters = async (req, res) => {
       .limit(parseInt(limit));
     const total = await Meter.countDocuments(query);
     res.json({ meters, total, pages: Math.ceil(total / limit) });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+exports.getApprovedMeters = async (req, res) => {
+  try {
+    const meters = await ApprovedMeter.find().sort({ createdAt: -1 });
+    res.json(meters);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+exports.addApprovedMeter = async (req, res) => {
+  try {
+    const { meterNumber, meterType, address, source, isActive } = req.body;
+    const normalizedMeterNumber = normalizeMeterNumber(meterNumber);
+
+    if (!normalizedMeterNumber) {
+      return res.status(400).json({ message: 'Meter number is required' });
+    }
+    if (!isValidMeterNumber(normalizedMeterNumber)) {
+      return res.status(400).json({ message: 'Enter a valid 11 to 13 digit meter number' });
+    }
+
+    const approvedMeter = await ApprovedMeter.create({
+      meterNumber: normalizedMeterNumber,
+      meterType: meterType || 'prepaid',
+      address: address || '',
+      source: source || 'company-api',
+      isActive: isActive !== undefined ? isActive : true,
+      createdBy: req.user.id,
+      updatedBy: req.user.id
+    });
+
+    res.status(201).json(approvedMeter);
+  } catch (error) {
+    if (error.code === 11000) {
+      return res.status(400).json({ message: 'This meter number already exists in the company registry' });
+    }
+    res.status(500).json({ message: error.message });
+  }
+};
+
+exports.updateApprovedMeter = async (req, res) => {
+  try {
+    const { meterNumber, meterType, address, source, isActive } = req.body;
+    const approvedMeter = await ApprovedMeter.findById(req.params.id);
+
+    if (!approvedMeter) {
+      return res.status(404).json({ message: 'Approved meter not found' });
+    }
+
+    if (meterNumber !== undefined) {
+      const normalizedMeterNumber = normalizeMeterNumber(meterNumber);
+      if (!isValidMeterNumber(normalizedMeterNumber)) {
+        return res.status(400).json({ message: 'Enter a valid 11 to 13 digit meter number' });
+      }
+      approvedMeter.meterNumber = normalizedMeterNumber;
+    }
+    if (meterType) approvedMeter.meterType = meterType;
+    if (address !== undefined) approvedMeter.address = address;
+    if (source) approvedMeter.source = source;
+    if (isActive !== undefined) approvedMeter.isActive = isActive;
+
+    approvedMeter.updatedBy = req.user.id;
+    await approvedMeter.save();
+
+    res.json(approvedMeter);
+  } catch (error) {
+    if (error.code === 11000) {
+      return res.status(400).json({ message: 'This meter number already exists in the company registry' });
+    }
+    res.status(500).json({ message: error.message });
+  }
+};
+
+exports.deleteApprovedMeter = async (req, res) => {
+  try {
+    const approvedMeter = await ApprovedMeter.findByIdAndDelete(req.params.id);
+    if (!approvedMeter) {
+      return res.status(404).json({ message: 'Approved meter not found' });
+    }
+    res.json({ message: 'Approved meter removed successfully' });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }

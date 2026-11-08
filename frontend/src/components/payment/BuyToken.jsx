@@ -5,11 +5,17 @@ import { Link } from 'react-router-dom';
 import api from '../../services/api';
 import toast from 'react-hot-toast';
 
-const STEPS = ['Select Meter', 'Enter Amount', 'Confirm', 'Payment'];
+const STEPS = ['Select Meter', 'Enter Amount', 'Confirm', 'Complete'];
+const MIN_PURCHASE_AMOUNT = 100;
+const MAX_PURCHASE_AMOUNT = 10000;
 
 export default function BuyToken() {
   const [step, setStep] = useState(0);
   const [meters, setMeters] = useState([]);
+  const [paymentMode, setPaymentMode] = useState('demo');
+  const [useCredit, setUseCredit] = useState(false);
+  const [creditAccount, setCreditAccount] = useState(null);
+  const [creditLoading, setCreditLoading] = useState(true);
   const [selectedMeter, setSelectedMeter] = useState(null);
   const [amount, setAmount] = useState('');
   const [loading, setLoading] = useState(false);
@@ -17,15 +23,36 @@ export default function BuyToken() {
 
   useEffect(() => {
     api.get('/meters').then((res) => setMeters(res.data)).catch(() => toast.error('Failed to load meters'));
+    api.get('/health').then(({ data }) => {
+      if (data.mode === 'paystack') setPaymentMode('paystack');
+    }).catch((error) => console.error('Failed to load payment mode', error));
+    api.get('/credit/account')
+      .then(({ data }) => setCreditAccount(data))
+      .catch((error) => {
+        console.error('Failed to load credit account', error);
+        toast.error('Unable to load your credit status');
+      })
+      .finally(() => setCreditLoading(false));
   }, []);
 
   const handlePayment = async () => {
     setLoading(true);
     try {
-      const { data } = await api.post('/payments/initialize', { meterId: selectedMeter._id, amount: parseInt(amount) });
+      const { data } = await api.post('/payments/initialize', {
+        meterId: selectedMeter._id,
+        amount: parseInt(amount),
+        paymentMethod: useCredit ? 'credit' : paymentMode
+      });
+      if (data.authorization_url) {
+        window.location.assign(data.authorization_url);
+        return;
+      }
       setResult(data.data);
+      if (data.data.isCredit) {
+        setCreditAccount((current) => ({ ...current, balance: data.data.creditBalance, canPurchaseOnCredit: false }));
+      }
       setStep(4);
-      toast.success('Payment successful!');
+      toast.success(data.data.isCredit ? 'Credit purchase recorded' : 'Payment successful!');
     } catch (err) {
       toast.error(err.response?.data?.message || 'Payment failed');
     } finally { setLoading(false); }
@@ -74,14 +101,23 @@ export default function BuyToken() {
             <motion.div key="step1" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="card space-y-4">
               <h3 className="font-semibold">Enter Amount</h3>
               <div className="grid grid-cols-3 gap-3 mb-4">
-                {[1000, 2000, 5000, 10000, 20000, 50000].map((amt) => (
+                {[1000, 2000, 5000, 10000].map((amt) => (
                   <button key={amt} onClick={() => setAmount(amt.toString())} className={`p-3 rounded-lg border-2 font-medium transition-all ${amount === amt.toString() ? 'border-primary-500 bg-primary-50 text-primary-700' : 'border-gray-200 hover:border-primary-300'}`}>₦{amt.toLocaleString()}</button>
                 ))}
               </div>
-              <input type="number" placeholder="Custom amount (min ₦100)" className="input-field" value={amount} onChange={(e) => setAmount(e.target.value)} min={100} />
+              <label className="block text-sm font-medium text-gray-700" htmlFor="purchase-amount">Custom amount</label>
+              <input id="purchase-amount" type="number" inputMode="numeric" step="1" placeholder="₦100–₦10,000" className="input-field" value={amount} onChange={(e) => setAmount(e.target.value)} min={MIN_PURCHASE_AMOUNT} max={MAX_PURCHASE_AMOUNT} />
+              <p className="text-sm text-gray-500">Purchases must be whole naira amounts from ₦100 to ₦10,000.</p>
               <div className="flex gap-3">
                 <button onClick={() => setStep(0)} className="btn-secondary flex-1">Back</button>
-                <button onClick={() => amount >= 100 ? setStep(2) : toast.error('Minimum amount is ₦100')} className="btn-primary flex-1">Continue</button>
+                <button onClick={() => {
+                  const purchaseAmount = Number(amount);
+                  if (Number.isInteger(purchaseAmount) && purchaseAmount >= MIN_PURCHASE_AMOUNT && purchaseAmount <= MAX_PURCHASE_AMOUNT) {
+                    setStep(2);
+                  } else {
+                    toast.error('Enter a whole amount between ₦100 and ₦10,000');
+                  }
+                }} className="btn-primary flex-1">Continue</button>
               </div>
             </motion.div>
           )}
@@ -92,9 +128,34 @@ export default function BuyToken() {
               <div className="bg-gray-50 rounded-xl p-4 space-y-2">
                 <div className="flex justify-between"><span className="text-gray-600">Meter</span><span className="font-medium">{selectedMeter.meterNumber}</span></div>
                 <div className="flex justify-between"><span className="text-gray-600">Amount</span><span className="font-medium">₦{parseInt(amount).toLocaleString()}</span></div>
-                <div className="flex justify-between"><span className="text-gray-600">Payment Method</span><span className="font-medium">Demo Mode</span></div>
+                <div className="flex justify-between"><span className="text-gray-600">Payment Method</span><span className="font-medium">{useCredit ? 'Credit' : paymentMode === 'paystack' ? 'Paystack test checkout' : 'Simulated payment'}</span></div>
               </div>
-              <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 text-sm text-yellow-800 flex items-center gap-2"><Zap className="w-4 h-4" /> Payment Environment: DEMO</div>
+              <div className="space-y-3">
+                <button
+                  type="button"
+                  onClick={() => setUseCredit(false)}
+                  className={`w-full rounded-xl border-2 p-4 text-left ${!useCredit ? 'border-primary-500 bg-primary-50' : 'border-gray-200'}`}
+                >
+                  <p className="font-medium">{paymentMode === 'paystack' ? 'Pay with Paystack test checkout' : 'Use simulated payment'}</p>
+                  <p className="text-sm text-gray-600">No real money is charged.</p>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setUseCredit(true)}
+                  disabled={creditLoading || creditAccount?.canPurchaseOnCredit !== true}
+                  className={`w-full rounded-xl border-2 p-4 text-left disabled:cursor-not-allowed disabled:opacity-60 ${useCredit ? 'border-primary-500 bg-primary-50' : 'border-gray-200'}`}
+                >
+                  <p className="font-medium">Buy on credit (up to ₦10,000)</p>
+                  <p className="text-sm text-gray-600">
+                    {creditLoading
+                      ? 'Loading credit status…'
+                      : creditAccount?.balance > 0
+                        ? `Repay your outstanding ₦${creditAccount.balance.toLocaleString()} credit before borrowing again.`
+                        : 'This simulated purchase adds the amount to your outstanding balance.'}
+                  </p>
+                </button>
+              </div>
+              <div className="bg-primary-50 border border-primary-200 rounded-lg p-3 text-sm text-primary-800 flex items-center gap-2"><Zap className="w-4 h-4" /> Payments are simulated; generated tokens do not recharge real meters.</div>
               <div className="flex gap-3">
                 <button onClick={() => setStep(1)} className="btn-secondary flex-1">Back</button>
                 <button onClick={() => setStep(3)} className="btn-primary flex-1">Proceed to Payment</button>
@@ -105,16 +166,22 @@ export default function BuyToken() {
           {step === 3 && (
             <motion.div key="step3" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="card text-center py-12">
               <div className="w-16 h-16 bg-primary-100 rounded-full flex items-center justify-center mx-auto mb-4"><Zap className="w-8 h-8 text-primary-600" /></div>
-              <h3 className="font-semibold text-lg mb-2">Processing Payment</h3>
-              <p className="text-gray-600 mb-6">Please wait while we process your demo payment...</p>
-              <button onClick={handlePayment} disabled={loading} className="btn-primary w-full">{loading ? <Loader2 className="w-5 h-5 animate-spin mx-auto" /> : 'Confirm Payment'}</button>
+              <h3 className="font-semibold text-lg mb-2">{useCredit ? 'Confirm Credit Purchase' : 'Confirm Payment'}</h3>
+              <p className="text-gray-600 mb-6">{useCredit
+                ? `This will add ₦${Number(amount).toLocaleString()} to your outstanding balance. You must repay the full balance before using credit again.`
+                : paymentMode === 'paystack'
+                  ? 'Continue to Paystack test checkout to complete your purchase.'
+                  : 'Confirm to simulate a successful purchase.'}</p>
+              <button onClick={handlePayment} disabled={loading} className="btn-primary w-full">{loading ? <Loader2 className="w-5 h-5 animate-spin mx-auto" /> : useCredit ? 'Confirm Credit Purchase' : paymentMode === 'paystack' ? 'Continue to Test Checkout' : 'Confirm Payment'}</button>
             </motion.div>
           )}
 
           {step === 4 && result && (
             <motion.div key="step4" initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} className="card text-center space-y-6">
               <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto"><Check className="w-10 h-10 text-green-600" /></div>
-              <div><h3 className="text-2xl font-bold text-green-700">Payment Successful</h3><p className="text-gray-600">Your token has been generated</p></div>
+              <div><h3 className="text-2xl font-bold text-green-700">{result.isCredit ? 'Credit Purchase Recorded' : 'Payment Successful'}</h3><p className="text-gray-600">Your sample token has been generated</p></div>
+              <div className="bg-primary-50 border border-primary-200 rounded-xl p-3 text-sm text-primary-900">Payments are simulated. This sample token cannot recharge a real electricity meter.</div>
+              {result.isCredit && <div className="bg-primary-50 border border-primary-200 rounded-xl p-3 text-sm text-primary-900">Outstanding balance: ₦{result.creditBalance.toLocaleString()}. Repay the full amount from your dashboard before buying on credit again.</div>}
               <div className="bg-gray-50 rounded-xl p-6 space-y-3 text-left max-w-sm mx-auto">
                 <div className="flex justify-between"><span className="text-gray-600">Meter Number</span><span className="font-medium">{result.meterNumber}</span></div>
                 <div className="flex justify-between"><span className="text-gray-600">Amount</span><span className="font-medium">₦{result.amount.toLocaleString()}</span></div>

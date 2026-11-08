@@ -34,12 +34,7 @@ export default function Login() {
   const handleResendVerification = async () => {
     setLoading(true);
     try {
-      const { data } = await api.post('/auth/resend-otp', { email: unverifiedEmail });
-      if (data.passwordSetupRequired && data.verificationToken) {
-        sessionStorage.setItem('registrationVerificationToken', data.verificationToken);
-        navigate(`/create-password?email=${encodeURIComponent(unverifiedEmail)}`);
-        return;
-      }
+      await api.post('/auth/resend-otp', { email: unverifiedEmail });
       navigate(`/verify-otp?email=${encodeURIComponent(unverifiedEmail)}`);
     } catch (err) {
       setError(err.response?.data?.message || 'Unable to resend verification code.');
@@ -60,7 +55,7 @@ export default function Login() {
     <AuthShell mode="login">
         <p className="auth-kicker">WELCOME BACK</p>
         <h2 className="auth-title">Sign in</h2>
-        <p className="auth-subtitle">Access your Kaduna Electric account.</p>
+        <p className="auth-subtitle">Access your King&apos;s Power account.</p>
         {error && (
           <div className="auth-alert" role="alert">
             <p>{error}</p>
@@ -87,7 +82,7 @@ export default function Login() {
         </form>
         <div className="auth-login-links">
           <Link to="/forgot-password" className="auth-inline-link">Forgot password?</Link>
-          <p className="auth-footer">New to Kaduna Electric? <Link to="/register" className="auth-inline-link">Create account</Link></p>
+          <p className="auth-footer">New to King&apos;s Power? <Link to="/register" className="auth-inline-link">Create account</Link></p>
         </div>
     </AuthShell>
   );

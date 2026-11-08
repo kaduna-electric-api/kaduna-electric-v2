@@ -49,7 +49,7 @@ export default function Register() {
     <AuthShell step={1}>
       <p className="auth-kicker">GET STARTED</p>
       <h2 className="auth-title">Create your account</h2>
-      <p className="auth-subtitle">Add your details to get started with Kaduna Electric.</p>
+      <p className="auth-subtitle">Create your King&apos;s Power account.</p>
 
       {error && <div className="auth-alert" role="alert">{error}</div>}
 

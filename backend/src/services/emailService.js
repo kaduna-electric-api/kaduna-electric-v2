@@ -44,19 +44,20 @@ const sendEmail = async (to, subject, html) => {
   }
 };
 
-const sendTokenEmail = async (to, token, amount, units, meterNumber, transactionRef) => {
+const sendTokenEmail = async (to, token, amount, units, meterNumber, transactionRef, { isCredit = false } = {}) => {
   const html = `
     <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-      <h2 style="color: #1a365d;">⚡ Kaduna Electric - Token Purchase</h2>
-      <p>Your electricity token has been generated successfully.</p>
+      <h2 style="color: #1a365d;">King's Power - Sample Token Purchase</h2>
+      <p>Your sample electricity token has been generated successfully.</p>
       <div style="background: #f7fafc; padding: 20px; border-radius: 8px; margin: 20px 0;">
         <p><strong>Token:</strong> <span style="font-size: 18px; letter-spacing: 2px; color: #2b6cb0;">${token}</span></p>
         <p><strong>Meter Number:</strong> ${meterNumber}</p>
-        <p><strong>Amount:</strong> ₦${amount.toLocaleString()}</p>
+        <p><strong>${isCredit ? 'Amount added to credit balance' : 'Amount'}:</strong> ₦${amount.toLocaleString()}</p>
+        ${isCredit ? '<p><strong>Payment status:</strong> Unpaid credit. Repay your outstanding balance before buying on credit again.</p>' : ''}
         <p><strong>Units:</strong> ${units} kWh</p>
         <p><strong>Transaction ID:</strong> ${transactionRef}</p>
       </div>
-      <p style="color: #718096; font-size: 12px;">Thank you for using Kaduna Electric.</p>
+      <p style="color: #718096; font-size: 12px;">Payments are simulated; this sample token cannot recharge a real meter.</p>
     </div>
   `;
   return await sendEmail(to, 'Your Electricity Token', html);
@@ -65,7 +66,7 @@ const sendTokenEmail = async (to, token, amount, units, meterNumber, transaction
 const sendComplaintResponseEmail = async (to, reference, response) => {
   const html = `
     <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-      <h2 style="color: #1a365d;">Kaduna Electric - Complaint Update</h2>
+      <h2 style="color: #1a365d;">King's Power - Complaint Update</h2>
       <p>Your complaint <strong>${reference}</strong> has been updated.</p>
       <div style="background: #f7fafc; padding: 20px; border-radius: 8px; margin: 20px 0;">
         <p><strong>Admin Response:</strong></p>
@@ -74,7 +75,7 @@ const sendComplaintResponseEmail = async (to, reference, response) => {
       <p>Status: <strong style="color: #38a169;">Resolved</strong></p>
     </div>
   `;
-  return await sendEmail(to, 'Complaint Response - Kaduna Electric', html);
+  return await sendEmail(to, `Complaint Response - King's Power`, html);
 };
 
 module.exports = { sendEmail, sendTokenEmail, sendComplaintResponseEmail, isEmailConfigured };

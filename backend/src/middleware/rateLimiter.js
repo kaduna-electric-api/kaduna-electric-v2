@@ -14,6 +14,7 @@ const apiLimiter = rateLimit({
   message: { message: 'Too many requests, please try again later' },
   standardHeaders: true,
   legacyHeaders: false,
+  skip: () => ['development', 'test'].includes(process.env.NODE_ENV),
 });
 
 module.exports = { authLimiter, apiLimiter };

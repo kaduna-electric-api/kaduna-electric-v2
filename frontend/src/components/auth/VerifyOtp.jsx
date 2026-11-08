@@ -136,12 +136,7 @@ export default function VerifyOtp() {
 
     setResending(true);
     try {
-      const { data } = await api.post('/auth/resend-otp', { email });
-      if (data.passwordSetupRequired && data.verificationToken) {
-        sessionStorage.setItem('registrationVerificationToken', data.verificationToken);
-        navigate(`/create-password?email=${encodeURIComponent(email)}`);
-        return;
-      }
+      await api.post('/auth/resend-otp', { email });
       setOtp(Array(OTP_LENGTH).fill(''));
       setCountdown(OTP_DURATION_SECONDS);
       setResendCooldown(60);

@@ -43,13 +43,15 @@ export default function MeterManager() {
         <h2 className="text-xl font-bold">My Meters</h2>
         <button onClick={()=>setShowAdd(!showAdd)} className="btn-primary flex items-center gap-2 text-sm"><Plus className="w-4 h-4"/> Add Meter</button>
       </div>
+      <p className="text-sm text-gray-600 mb-5">Only meter numbers actively approved by an administrator can be added or used for sample token purchases.</p>
 
       <AnimatePresence>
         {showAdd && (
           <motion.form initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} onSubmit={handleAdd} className="card mb-6 overflow-hidden">
             <h3 className="font-semibold mb-4">Add New Meter</h3>
+            <p className="text-sm text-gray-600 mb-4">Enter the exact meter number an administrator has added to the active approved-meter registry.</p>
             <div className="grid md:grid-cols-3 gap-4">
-              <input required placeholder="Meter Number" className="input-field" value={form.meterNumber} onChange={e=>setForm({...form,meterNumber:e.target.value})}/>
+              <input required inputMode="numeric" pattern="[0-9]{11,13}" minLength={11} maxLength={13} placeholder="11–13 digit meter number" className="input-field" value={form.meterNumber} onChange={e=>setForm({...form,meterNumber:e.target.value})}/>
               <input placeholder="Nickname (optional)" className="input-field" value={form.nickname} onChange={e=>setForm({...form,nickname:e.target.value})}/>
               <input placeholder="Address (optional)" className="input-field" value={form.address} onChange={e=>setForm({...form,address:e.target.value})}/>
             </div>

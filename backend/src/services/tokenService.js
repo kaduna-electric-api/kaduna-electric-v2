@@ -1,12 +1,12 @@
 const crypto = require('crypto');
 
 const generateElectricityToken = () => {
-  // Generate a 20-digit token in groups of 4
-  const bytes = crypto.randomBytes(10);
-  const hex = bytes.toString('hex').toUpperCase();
-  // Format: XXXX XXXX XXXX XXXX XXXX
-  const formatted = hex.match(/.{1,4}/g).join(' ');
-  return formatted;
+  const firstGroup = crypto.randomInt(1000, 10000);
+  const remainingGroups = Array.from(
+    { length: 4 },
+    () => crypto.randomInt(0, 10000).toString().padStart(4, '0')
+  );
+  return `${firstGroup}${remainingGroups.join('')}`;
 };
 
 const calculateUnits = (amount) => {

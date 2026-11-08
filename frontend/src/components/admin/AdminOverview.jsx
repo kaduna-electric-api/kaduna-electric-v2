@@ -1,21 +1,62 @@
 import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
-import { Users, CreditCard, CheckCircle, AlertCircle, TrendingUp, BarChart3 } from 'lucide-react';
+import { Users, CreditCard, CheckCircle, AlertCircle, TrendingUp, Send, Bell } from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import api from '../../services/api';
 import Loading from '../ui/Loading';
 import toast from 'react-hot-toast';
 
 const COLORS = ['#22c55e', '#ef4444', '#f59e0b'];
+const notificationStyles = {
+  info: 'bg-blue-50 text-blue-700 border-blue-200',
+  success: 'bg-green-50 text-green-700 border-green-200',
+  warning: 'bg-yellow-50 text-yellow-700 border-yellow-200',
+  critical: 'bg-red-50 text-red-700 border-red-200',
+};
 
 export default function AdminOverview() {
   const [stats, setStats] = useState(null);
+  const [notifications, setNotifications] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [form, setForm] = useState({ title: '', message: '', type: 'info' });
+  const [submitting, setSubmitting] = useState(false);
+
+  const loadDashboard = () => {
+    Promise.all([
+      api.get('/admin/dashboard'),
+      api.get('/notifications')
+    ])
+      .then(([dashboardRes, notifRes]) => {
+        setStats(dashboardRes.data);
+        setNotifications(notifRes.data.notifications || []);
+      })
+      .catch(() => toast.error('Failed to load dashboard'))
+      .finally(() => setLoading(false));
+  };
 
   useEffect(() => {
-    api.get('/admin/dashboard').then(res => { setStats(res.data); setLoading(false); })
-    .catch(() => { toast.error('Failed to load dashboard'); setLoading(false); });
+    loadDashboard();
   }, []);
+
+  const handleSubmit = async (event) => {
+    event.preventDefault();
+    if (!form.title.trim() || !form.message.trim()) {
+      toast.error('Please fill in the title and message');
+      return;
+    }
+
+    try {
+      setSubmitting(true);
+      await api.post('/notifications', { ...form, recipient: 'all' });
+      toast.success('Alert broadcast sent');
+      setForm({ title: '', message: '', type: 'info' });
+      loadDashboard();
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Unable to send alert');
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
   if (loading) return <Loading fullScreen/>;
 
@@ -24,6 +65,7 @@ export default function AdminOverview() {
     { icon: CreditCard, label: 'Total Transactions', value: stats?.stats?.totalTransactions || 0, color: 'bg-purple-50 text-purple-600' },
     { icon: CheckCircle, label: 'Successful Payments', value: stats?.stats?.successfulPayments || 0, color: 'bg-green-50 text-green-600' },
     { icon: TrendingUp, label: 'Total Revenue', value: `₦${(stats?.stats?.totalRevenue || 0).toLocaleString()}`, color: 'bg-electric-50 text-electric-600' },
+    { icon: CreditCard, label: 'Outstanding Credit', value: `₦${(stats?.stats?.outstandingCredit || 0).toLocaleString()}`, color: 'bg-amber-50 text-amber-600' },
     { icon: AlertCircle, label: 'Pending Complaints', value: stats?.stats?.pendingComplaints || 0, color: 'bg-red-50 text-red-600' },
     { icon: Users, label: 'New Users (This Month)', value: stats?.stats?.newUsersThisMonth || 0, color: 'bg-indigo-50 text-indigo-600' },
   ];
@@ -81,6 +123,51 @@ export default function AdminOverview() {
           </div>
         </motion.div>
       </div>
+
+      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.5 }} className="mt-6 bg-slate-800 rounded-xl p-6 border border-slate-700">
+        <div className="flex items-center gap-2 mb-4">
+          <Bell className="w-5 h-5 text-primary-400" />
+          <h3 className="text-lg font-semibold text-white">Broadcast Alert</h3>
+        </div>
+
+        <div className="grid lg:grid-cols-[1.1fr_0.9fr] gap-6">
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div>
+              <label className="block text-sm text-slate-300 mb-2">Title</label>
+              <input value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} className="w-full rounded-lg border border-slate-600 bg-slate-900 text-white px-3 py-2 focus:outline-none focus:border-primary-500" placeholder="Service update" />
+            </div>
+            <div>
+              <label className="block text-sm text-slate-300 mb-2">Message</label>
+              <textarea value={form.message} onChange={(e) => setForm({ ...form, message: e.target.value })} rows="3" className="w-full rounded-lg border border-slate-600 bg-slate-900 text-white px-3 py-2 focus:outline-none focus:border-primary-500" placeholder="Share important information with all customers" />
+            </div>
+            <div>
+              <label className="block text-sm text-slate-300 mb-2">Priority</label>
+              <select value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value })} className="w-full rounded-lg border border-slate-600 bg-slate-900 text-white px-3 py-2 focus:outline-none focus:border-primary-500">
+                <option value="info">Info</option>
+                <option value="success">Success</option>
+                <option value="warning">Warning</option>
+                <option value="critical">Critical</option>
+              </select>
+            </div>
+            <button type="submit" disabled={submitting} className="inline-flex items-center gap-2 bg-primary-600 hover:bg-primary-500 disabled:opacity-70 text-white px-4 py-2 rounded-lg font-medium">
+              <Send className="w-4 h-4" /> {submitting ? 'Sending...' : 'Send to all users'}
+            </button>
+          </form>
+
+          <div className="space-y-3">
+            {notifications.length === 0 ? (
+              <p className="text-slate-400 py-6">No broadcast alerts yet.</p>
+            ) : (
+              notifications.slice(0, 4).map((item) => (
+                <div key={item._id} className={`rounded-lg border p-3 ${notificationStyles[item.type] || notificationStyles.info}`}>
+                  <p className="font-medium text-sm">{item.title}</p>
+                  <p className="text-xs mt-1 opacity-80">{item.message}</p>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+      </motion.div>
     </div>
   );
 }
